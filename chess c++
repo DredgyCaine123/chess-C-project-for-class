@@ -1,0 +1,380 @@
+THE MAIN FILE OF CODE ENDS AT LINE 270, AND THE HEADER FILE BEGINS AT LINE 280
+// SFML Manual Graphics Library used.
+#include <SFML/Graphics.hpp> 
+#include <time.h>
+#include "Connector.hpp"
+using namespace sf;
+
+int size = 56;
+Vector2f offset(28,28);
+
+Sprite f[32]; // chess pieces/figures.
+std::string position="";
+
+// Board layout in which all the sprites are assigned values and layed out onto the screen so they can be played/drawn to the screen.
+int board[8][8] = 
+    {-1,-2,-3,-4,-5,-3,-2,-1,
+     -6,-6,-6,-6,-6,-6,-6,-6,
+      0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0,
+      6, 6, 6, 6, 6, 6, 6, 6,
+      1, 2, 3, 4, 5, 3, 2, 1};
+
+
+// takes a Vector2f position and returns a string in algebraic chess notation.
+std::string toChessNote(Vector2f p) 
+{
+  std::string s = ""; 
+
+  s += char(p.x/size+97); 
+  // Idea mainly used from stack overflow, and the idea of it is to append a character to the string s.
+  // Then it will convert the x-coordinate of the p vector divided by size (the size of each square on the chessboard) to an integer, adds 97, and then converts it to a character. 
+
+  s += char(7-p.y/size+49); 
+  // Coincides with line 28 about being used from a user on stack overflow, this line appends another character to the string s. 
+  // It converts the y-coordinate of the p vector divided by size to an integer, subtracts it from 7, adds 49, and then also converts character.
+  return s; 
+}
+
+
+// Takes two char variables representing coordinates in algebraic chess notation and returns a Vector2f position.
+Vector2f toCoord(char a,char b)
+{
+   int x = int(a) - 97;
+   // This line declares an integer variable x and assigns it the value of a converted to an integer (int(a)) minus 97. 
+   // The subtraction of 97 is performed to convert the character a from its ASCII value to an index in the range 0-7, the letter 'a' corresponds to the index 0, 'b' to 1, and so on.
+
+   int y = 7-int(b)+49;
+   // This line declares an integer variable y and assigns it the value of 7 minus b converted to an integer (int(b)) plus 49. 
+   // The addition of 49 is performed to convert the character b from its ASCII value to an index in the range 0-7, the digit '1' corresponds to the index 7, '2' to 6, and so on.
+   
+   return Vector2f(x*size,y*size);
+}
+
+
+// takes a string in algebraic chess notation and moves a piece on the board according to the specified move.
+// Is called with a string representing the move in algebraic chess notation.
+void move(std::string str)
+{
+    Vector2f oldPos = toCoord(str[0],str[1]);
+    // This line calls the toCoord function with the first and second characters of the str string as arguments. 
+    // It assigns the returned Vector2f object to the oldPos variable, representing the old position of the moved piece.
+    
+    Vector2f newPos = toCoord(str[2],str[3]);
+    // This line calls the toCoord function with the third and fourth characters of the str string as arguments. 
+    // It assigns the returned Vector2f object to the newPos variable, representing the new position of the moved piece.
+
+    // For loop that checks each position individually on the board before the move.
+    for(int i=0;i<32;i++)
+     if (f[i].getPosition()==newPos) f[i].setPosition(-100,-100);
+    // checks if the current piece's position matches the newPos position. If there is a match, it means that there is a piece at newPos that needs to be captured. 
+    // In that case, f[i].setPosition(-100, -100) sets the position of that piece sprite to (-100, -100), effectively hiding it from the board.
+        
+    // For loop that updates the position and locks the sprite in the position it was moved to on the board.
+    for(int i=0;i<32;i++)
+        
+     if (f[i].getPosition()==oldPos) f[i].setPosition(newPos);
+    // checks if the current piece's position matches the oldPos position. If there is a match, it means that this is the piece that was moved. 
+    // In that case, f[i].setPosition(newPos) sets the position of that piece sprite to newPos, effectively updating its position on the board.
+
+    // Idea and code mostly taken from CHATGPT and Stack overflow, but the whole point of it doesn't work.
+    // Implements the idea of castling, which is when the spaces on each side of the king to the rook is free, which moves both pieces accordingly.
+    // If the king didn't move when put in check, it won't move.
+    if (str=="e1g1") 
+        if (position.find("e1")==-1) 
+            move("h1f1"); 
+    if (str=="e8g8") 
+        if (position.find("e8")==-1) 
+            move("h8f8");
+    if (str=="e1c1") 
+        if (position.find("e1")==-1) 
+            move("a1d1");
+    if (str=="e8c8") 
+        if (position.find("e8")==-1)
+            move("a8d8");
+}
+
+
+// initializes the chess board with the starting pieces.
+void loadPosition()
+{
+    int k = 0;
+    // Loops through each square on the board.
+    for (int i = 0; i < 8; i++)
+        for (int j = 0; j < 8; j++)
+        {
+            int n = board[i][j]; // Get the piece at the current square.
+            if (!n) continue; // If the square is empty, continue to the next square.
+            int x = abs(n) - 1; // Calculate the index of the piece in the texture file.
+            int y = n > 0 ? 1 : 0;  // Calculate the row of the piece in the texture file. 
+            f[k].setTextureRect(IntRect(size * x, size * y, size, size)); // Set the texture rectangle of the sprite to display the correct piece.
+            f[k].setPosition(size * j, size * i); // Set the position of the sprite to the correct square on the board.
+            k++;  // Increment the index for the next sprite.
+        }
+
+    // Loop through each move in the game's position string and call the move() function to make the move on the board and update the sprites.
+    for (int i = 0; i < position.length(); i += 5)
+        move(position.substr(i, 4));
+}
+
+
+// where the actual game takes place. It sets up the game window, loads the chess board and pieces, and handles user input.
+int main()
+{
+    // Create a window with a size of 504x504 and title "The Chess! (press SPACE)"
+    RenderWindow window(VideoMode(504, 504), "The Chess! (press SPACE)");
+
+    // Connect to the chess engine (Stockfish) by passing the executable file name as argument
+    ConnectToEngine("stockfish.exe");
+
+    // Load textures for the pieces and the board
+    Texture t1, t2;
+    t1.loadFromFile("images/figures.png");
+    t2.loadFromFile("images/board.png");
+
+    // Set the texture for each piece sprite
+    for (int i = 0; i < 32; i++)
+        f[i].setTexture(t1);
+
+    // Create a sprite for the board and set its texture
+    Sprite sBoard(t2);
+
+    // Load the initial position of the pieces onto the board
+    loadPosition();
+
+    bool isMove = false; // A flag that tells us if a piece is being moved
+    float dx = 0, dy = 0; // Variables to keep track of the mouse position and the piece being moved
+    Vector2f oldPos, newPos; // Variables to keep track of the old and new position of a moved piece
+    std::string str; // A string that stores the chess notation for a move
+    int n = 0; // Index of the piece that is being moved
+
+    // The game loop
+    while (window.isOpen())
+    {
+        // Get the mouse position relative to the board
+        Vector2i pos = Mouse::getPosition(window) - Vector2i(offset);
+
+        // Poll events from the window
+        Event e;
+        while (window.pollEvent(e))
+        {
+            // If the window is closed, exit the program
+            if (e.type == Event::Closed)
+                window.close();
+
+            // If the backspace key is pressed, undo the last move
+            if (e.type == Event::KeyPressed)
+                if (e.key.code == Keyboard::BackSpace)
+                {
+                    if (position.length() > 6)
+                        position.erase(position.length() - 6, 5);
+                    loadPosition();
+                }
+
+            // If the left mouse button is pressed, check if a piece is being selected
+            if (e.type == Event::MouseButtonPressed)
+                if (e.key.code == Mouse::Left)
+                    for (int i = 0; i < 32; i++) // This loop is used to iterate over the sprites representing the pieces on the board.
+                        if (f[i].getGlobalBounds().contains(pos.x, pos.y))
+                        // checks if the current piece sprite (represented by f[i]) contains the position (pos.x, pos.y).
+                        // This condition checks if the mouse click occurred within the bounds of the current piece sprite.
+                        {
+                            isMove = true; 
+                            n = i; 
+                            dx = pos.x - f[i].getPosition().x; 
+                            // This line calculates the difference between the x-coordinate of the mouse click position (pos.x) and the x-coordinate of the current piece's position (f[i].getPosition().x). 
+                            // It computes the horizontal offset between the mouse click and the piece.
+
+                            dy = pos.y - f[i].getPosition().y;
+                            // This line calculates the difference between the y-coordinate of the mouse click position (pos.y) and the y-coordinate of the current piece's position (f[i].getPosition().y). 
+                            // It computes the vertical offset between the mouse click and the piece.
+                            oldPos = f[i].getPosition(); 
+                            // This line assigns the current position of the piece (f[i].getPosition()) to the variable oldPos. 
+                            // It stores the original position of the piece before it is moved.
+                        }
+
+            // If the left mouse button is released, check if a piece is being moved and update the board
+            if (e.type == Event::MouseButtonReleased)
+                if (e.key.code == Mouse::Left)
+                {
+                    isMove = false;
+                    Vector2f p = f[n].getPosition() + Vector2f(size / 2, size / 2);
+                    // This line calculates the new position p for the moved piece. It adds half the size of the piece (size / 2) to the current position of the piece (f[n].getPosition()).
+                    // It is used to determine the center position of the piece after the move.
+
+                    newPos = Vector2f(size * int(p.x / size), size * int(p.y / size));
+                    // This line calculates the final position newPos for the moved piece. It calculates the grid-aligned position by rounding down the x-coordinate of p divided by size and multiplying it by size. 
+                    // The same calculation is done for the y-coordinate. This ensures that the piece is snapped to the closest grid position.
+
+                    str = toChessNote(oldPos) + toChessNote(newPos);
+                    move(str);
+                    if (oldPos != newPos)
+                        position += str + " ";
+                    //  This line appends the move string str followed by a space character to the position string. It stores the history of moves made in the game.
+                    f[n].setPosition(newPos);
+                }
+        }
+
+       // If the space bar is pressed, it makes a move with the chess engine.
+       // Stopped working in the send over, and wasn't made by myself, was used mostly from Stack overflow and ChatGPT.
+       if (Keyboard::isKeyPressed(Keyboard::Space))
+       {
+         str =  getNextMove(position);        
+         oldPos = toCoord(str[0],str[1]);
+         newPos = toCoord(str[2],str[3]);
+         for(int i=0;i<32;i++) if (f[i].getPosition()==oldPos) n=i;
+         
+
+         // Animation added for the stockfish bot whenever it moves a piece.
+         // Made entirely by ChatGPT to go with the size of my board.
+         for(int k=0;k<50;k++)
+          {
+            Vector2f p = newPos - oldPos;
+            f[n].move(p.x/50, p.y/50); 
+            window.draw(sBoard);
+            for(int i=0;i<32;i++) f[i].move(offset);
+            for(int i=0;i<32;i++) window.draw(f[i]); window.draw(f[n]);
+            for(int i=0;i<32;i++) f[i].move(-offset);
+            window.display();
+          }
+
+        move(str);  position+=str+" ";
+        f[n].setPosition(newPos); 
+        }
+
+        if (isMove) f[n].setPosition(pos.x-dx,pos.y-dy);
+
+    // Draws the screen and board so you can see the game and gameplay.
+    window.clear();
+    window.draw(sBoard);
+    for(int i=0;i<32;i++) f[i].move(offset);
+    // This loop iterates over the array of sprites f (representing the chess pieces) and moves each sprite by the offset defined earlier. 
+    // This is done to adjust the positions of the sprites relative to the board.
+
+    for(int i=0;i<32;i++) window.draw(f[i]); window.draw(f[n]);
+    // This loop draws all the sprites in the f array (representing the chess pieces) onto the window. 
+    // Additionally, it draws the currently selected piece f[n].
+
+    for(int i=0;i<32;i++) f[i].move(-offset);
+    // This loop iterates over the array of sprites f (representing the chess pieces) and moves each sprite back by the offset defined earlier.
+    // This reverts the adjustment made in the previous loop, restoring the original positions of the sprites.
+
+    window.display();
+    }
+
+    CloseConnection();
+    // Closes the connection between the program and the stockfish bot implemented in the connector header file.
+
+    return 0;
+}
+
+
+
+
+
+
+
+
+MOST OF THE CODE IN THE HEADER FILE WAS MADE USING ChatGPT, Stack Overflow, AND DIFFERENT YouTube CONTENT CREATORS.
+Connector File. 
+// These two lines are known as header guards. They prevent the contents of the header file from being included more than once in the same source code file.
+#ifndef CONNECTOR_H
+#define CONNECTOR_H
+
+
+#include <windows.h>
+#include <stdio.h>
+#include <iostream>
+#include <string>
+
+// These lines declare several variables of different types that will be used for creating and interacting with pipes between the C++ program and the Stockfish chess engine.
+STARTUPINFO sti = {0};
+SECURITY_ATTRIBUTES sats = {0};
+PROCESS_INFORMATION pi = {0};
+HANDLE pipin_w, pipin_r, pipout_w, pipout_r;
+BYTE buffer[2048];
+DWORD writ, excode, read, available;
+
+/* This function ConnectToEngine() creates pipes for input and output and starts the Stockfish chess engine process. The function takes the path to the executable file of the engine as an argument. 
+It initializes several variables, creates pipes, sets the startup information structure, and finally starts the process using CreateProcess() function. */
+// Function made mostly by ChatGPT, and implementations from Stack Overflow.
+void ConnectToEngine(char* path)
+{
+   pipin_w = pipin_r = pipout_w = pipout_r = NULL;  // Initialize pipe handles to NULL
+   sats.nLength = sizeof(sats); // Set the length of the SECURITY_ATTRIBUTES structure
+   sats.bInheritHandle = TRUE; // Allow inheritable handles
+   sats.lpSecurityDescriptor = NULL; // Set the security descriptor to NULL
+
+   // Create two unidirectional anonymous pipes, one for input and one for output
+   CreatePipe(&pipout_r, &pipout_w, &sats, 0);
+   CreatePipe(&pipin_r, &pipin_w, &sats, 0);
+         
+   // Set the STARTUPINFO structure with the appropriate values
+   sti.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES; // Use the specified startup flags
+   sti.wShowWindow = SW_HIDE; // Hide the console window
+   sti.hStdInput = pipin_r; // Redirect standard input to the read end of the input pipe
+   sti.hStdOutput = pipout_w; // Redirect standard output to the write end of the output pipe
+   sti.hStdError = pipout_w; // Redirect standard error to the write end of the output pipe
+
+   // Create a new process using the specified executable file and the previously set startup information
+   CreateProcess(NULL, path, NULL, NULL, TRUE,0, NULL, NULL, &sti, &pi);
+}
+
+
+std::string getNextMove(std::string position)
+{     
+    std::string str;
+    position = "position startpos moves " + position + "\ngo\n";    
+
+    // Write the current position to the pipe input buffer
+    WriteFile(pipin_w, position.c_str(), position.length(), &writ, NULL);
+    
+    // Wait for the chess engine to respond
+    Sleep(500);
+    
+    // Check if there is any output available from the chess engine
+    PeekNamedPipe(pipout_r, buffer, sizeof(buffer), &read, &available, NULL);
+    
+    // Loop until all available output has been read
+    do
+    {   
+        // Clear the buffer
+        ZeroMemory(buffer, sizeof(buffer));
+        
+        // Read from the pipe output buffer
+        if (!ReadFile(pipout_r, buffer, sizeof(buffer), &read, NULL) || !read) break;
+        
+        // Append the read data to the string variable
+        buffer[read] = 0;
+        str += (char*)buffer;
+    }
+    while (read >= sizeof(buffer));
+    
+    // Check if the chess engine has responded with a move
+    int n = str.find("bestmove");
+    if (n != -1) {
+        // Extract the move from the engine response
+        return str.substr(n+9, 4);
+    }
+             
+    // If the chess engine did not respond with a move, return an error string
+    return "error";
+}
+
+// The CloseConnection function sends a "quit" command to the Stockfish engine and closes the handles to the pipes and the process.
+
+void CloseConnection()
+{
+    WriteFile(pipin_w, "quit\n", 5,&writ, NULL);
+    if(pipin_w != NULL) CloseHandle(pipin_w); // This releases the handle to the write end of the pipe used to send commands to the chess engine.
+    if(pipin_r != NULL) CloseHandle(pipin_r); // This releases the handle to the read end of the pipe used to receive commands from the chess engine.
+    if(pipout_w != NULL) CloseHandle(pipout_w); // This releases the handle to the write end of the pipe used to send output to the chess engine.
+    if(pipout_r != NULL) CloseHandle(pipout_r); // This releases the handle to the read end of the pipe used to receive output from the chess engine.
+    if(pi.hProcess != NULL) CloseHandle(pi.hProcess); // This releases the handle to the process created by CreateProcess().
+    if(pi.hThread != NULL) CloseHandle(pi.hThread); // This releases the handle to the thread created by CreateProcess().
+}
+
+// The #endif statement closes the conditional inclusion started by the #ifndef statement.
+#endif CONNECTOR_H
